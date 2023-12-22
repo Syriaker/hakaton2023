@@ -1,13 +1,17 @@
+from threading import Thread
+
 from em_st_artifacts.emotional_math import *
 from neurosdk.scanner import *
-
 
 class Core:
     def __init__(self):
         self.emotion_detector = EmotionDetector()
 
-def on_sensor_found(scanner: Scanner, sensor: Sensor):
-    print(scanner, sensor)
+    def start(self):
+        self.emotion_detector.search_device()
+
+        self.emotion_detector.calibrate()
+
 
 class EmotionDetector:
     def __init__(self):
@@ -35,11 +39,29 @@ class EmotionDetector:
                                                      self.short_artifact_detect_setting,
                                                      self.mental_amd_spectral_settings)
 
-    def search_device(self):
+    def _separated_search_device(self):
+        print("scaning")
         self.scanner.start()
-        self.scanner.sensorsChanged = on_sensor_found
 
-        self.scanner.sensors()
+    @staticmethod
+    def on_sensor_found(scanner: Scanner, sensors: List[SensorInfo]):
+        print(sensors)
+
+    def search_device(self):
+        search_tread = Thread(target=self._separated_search_device)
+        self.scanner.sensorsChanged = EmotionDetector.on_sensor_found
+
+        search_tread.start()
+
+        self.scanner.stop()
+        self.scanner.sensorsChanged = None
+
+        self.sensors = self.scanner.sensors()
+
+        print(self.sensors)
+
+    def read_data(self):
+        pass
 
     def calibrate(self):
         # resistance < 2e6
@@ -47,5 +69,9 @@ class EmotionDetector:
 
     def __del__(self):
         del self.emotions
+
+core = Core()
+
+core.start()
 
 
