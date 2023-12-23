@@ -48,11 +48,34 @@ class EmotionDetector:
                                                      self.short_artifact_detect_setting,
                                                      self.mental_amd_spectral_settings)
 
+        self.emotions.set_calibration_length(8)
+        self.emotions.set_mental_estimation_mode(False)
+        self.emotions.set_skip_wins_after_artifact(10)
+        self.emotions.set_zero_spect_waves(True, 0, 1, 1, 1, 0)
+        self.emotions.set_spect_normalization_by_bands_width(True)
+
     def read_data(self):
         def target():
             stop: bool = False
 
+            channels: List[RawChannels] = []
+
             def on_brain_bit_signal_data_received(sensor, data):
+                for d in data:
+                    channels.append(RawChannels(d.T3 - d.O1, d.T4 - d.O2))
+                channels.append(data)
+
+                self.emotions.push_data(channels)
+                self.emotions.process_data_arr()
+
+                if not self.emotions.calibration_finished():
+                    print(f'Artifacted: {self.emotions.is_both_sides_artifacted()}')
+                    print(f'Calibration percents: {self.emotions.get_calibration_percents()}')
+                else:
+                    print(f'Artifacted: {self.emotions.is_artifacted_sequence()}')
+                    print(f'Mental data: {self.emotions.read_mental_data_arr()}')
+                    print(f'Spectral data: {self.emotions.read_spectral_data_percents_arr()}')
+
                 print(data)
 
             self.current_sensor.signalDataReceived = on_brain_bit_signal_data_received
@@ -66,8 +89,7 @@ class EmotionDetector:
 
         start_separate_thread(target)
 
-    def on_sensors_info_list_changed(self, scanner: Scanner, sensors_info: List[Sensor]):
-        print(sensors_info)
+    def on_sensors_info_list_changed(self, scanner: Scanner, sensors_info: List[SensorInfo]):
         self.current_sensors_info_list = sensors_info
 
     def start_sensors_search(self):
@@ -123,26 +145,36 @@ class EmotionDetector:
     def on_current_sensor_battery_state_changed(self, sensor: Sensor, battery: int):
         pass
 
-    def get_current_sensor_parameter(self) -> List[ParameterInfo]:
+    def get_current_sensor_parameters(self) -> List[ParameterInfo]:
         return self.current_sensor.parameters
 
-    def get_current_sensor_command(self):
+    def get_current_sensor_commands(self):
         return self.current_sensor.commands
 
-    def calibrate(self):
-        # resistance < 2e6
-        pass
+    def start_calibration(self):
+        self.emotions.start_calibration()
+
+    def stop_calibration(self):
+        self.emotions.calibration_finished()
+
+    def start(self):
+        self.read_data()
 
     def __del__(self):
+        self.disconnect_from_sensor()
         del self.scanner
         del self.emotions
 
 if __name__ == '__main__':
     core = Core()
 
-    commands = {
-        "strsr": lambda: core.emotion_detector.start_sensors_search(),
-        "srpsr": lambda: core.emotion_detector.stop_sensors_search(),
+    commands: typing.Dict[str, typing.Callable] = {
+        "strsr": lambda d: core.emotion_detector.start_sensors_search(),
+        "stpsr": lambda d: core.emotion_detector.stop_sensors_search(),
+        "snrinflst": lambda d: print(core.emotion_detector.get_sensors_info_list()),
+        "snrcnt": lambda d: core.emotion_detector.connect_to_sensor(int(d[0])),
+        "start": lambda d: core.emotion_detector.start(),
+        "clb": lambda d: core.emotion_detector.start_calibration(),
     }
 
     while True:
@@ -152,4 +184,10 @@ if __name__ == '__main__':
         if command == "exit":
             break
 
-        commands[command]()
+        cmd = command.split(" ")
+        if len(cmd) > 0 and cmd[0] in commands.keys():
+            commands[cmd[0]](cmd[1:] if len(cmd) > 1 else [])
+        else:
+            print("illegal v=co,,and")
+
+del core
