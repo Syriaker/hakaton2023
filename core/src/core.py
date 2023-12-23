@@ -206,4 +206,4 @@ if __name__ == '__main__':
     input()
     core.emotion_detector.stop_read_data()
 
-del core
+    del core
