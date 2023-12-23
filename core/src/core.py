@@ -18,6 +18,7 @@ class Core:
 
 class EmotionDetector:
     def __init__(self):
+        self.data_buffer: List[List[float]] = None
         self.read_data_stop: bool = False
         self.resistence: List[float] = None
 
@@ -69,6 +70,9 @@ class EmotionDetector:
                 if not self.emotions.calibration_finished():
                     print(f"Calibration A:{self.emotions.is_both_sides_artifacted()} P:{self.emotions.get_calibration_percents()}")
                 else:
+                    if not self.emotions.is_artifacted_sequence():
+                        d = self.emotions.read_mental_data_arr()[-1]
+                        self.data_buffer.append([d.rel_relaxation, d.rel_attention])
                     print(f"Data D:{self.emotions.read_mental_data_arr()[-1]} A:{self.emotions.is_artifacted_sequence()}")
 
             self.current_sensor.signalDataReceived = on_brain_bit_signal_data_received
@@ -155,7 +159,18 @@ class EmotionDetector:
         self.read_data()
 
     def get_data(self) -> List[float]:
-        ...
+        relax = 0
+        attention = 0
+        count = 0
+
+        for datum in self.data_buffer:
+            relax += datum[0]
+            attention += datum[1]
+
+        return [relax / count, attention / count]
+
+    def flush_data(self):
+        self.data_buffer = None
 
     def __del__(self):
         self.disconnect_from_sensor()
