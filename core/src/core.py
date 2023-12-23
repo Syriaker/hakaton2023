@@ -14,11 +14,13 @@ class Core:
         del self.emotion_detector
 
 
-def start_separate_thread(target: classmethod):
+def start_separate_thread(target: typing.Callable):
     Thread(target=target).start()
 
 class EmotionDetector:
     def __init__(self):
+        self.resistence: List[float] = None
+
         self.scanner: Scanner = Scanner([SensorFamily.LEBrainBit])
         self.current_sensors_info_list: List[SensorInfo] = None
         self.current_sensor: Sensor = None
@@ -47,16 +49,22 @@ class EmotionDetector:
                                                      self.mental_amd_spectral_settings)
 
     def read_data(self):
-        def on_brain_bit_signal_data_received(sensor, data):
-            print(data)
+        def target():
+            stop: bool = False
 
-        self.current_sensor.signalDataReceived = on_brain_bit_signal_data_received
-        start_separate_thread(self.current_sensor.exec_command(SensorCommand.StartSignal))
+            def on_brain_bit_signal_data_received(sensor, data):
+                print(data)
 
-        input()
+            self.current_sensor.signalDataReceived = on_brain_bit_signal_data_received
+            start_separate_thread(self.current_sensor.exec_command(SensorCommand.StartSignal))
 
-        self.current_sensor.signalDataReceived = None
-        start_separate_thread(self.current_sensor.exec_command(SensorCommand.StopSignal))
+            while not stop:
+                time.sleep(0.2)
+
+            self.current_sensor.signalDataReceived = None
+            start_separate_thread(self.current_sensor.exec_command(SensorCommand.StopSignal))
+
+        start_separate_thread(target)
 
     def on_sensors_info_list_changed(self, scanner: Scanner, sensors_info: List[Sensor]):
         print(sensors_info)
@@ -77,41 +85,43 @@ class EmotionDetector:
         if self.current_sensor is not None:
             self.current_sensor.disconnect()
 
-        if type(sensor) == int:
-            s = self.scanner.create_sensor(self.current_sensors_info_list[sensor])
-            s.batteryChanged = self.on_current_sensor_battery_state_changed
-            self.current_sensor = s
-            return s
+        s = self.scanner.create_sensor(self.current_sensors_info_list[sensor])
+        s.batteryChanged = self.on_current_sensor_battery_state_changed
+        self.current_sensor = s
+        return s
 
     def disconnect_from_sensor(self):
         if self.current_sensor is not None:
             self.current_sensor.disconnect()
             self.current_sensor = None
 
-    def get_current_sensor_resistence(self) -> List[float]:
-        mas: List[List[float] | float] = [[], [], [], []]
+    def get_current_sensor_resistence(self):
+        def target():
+            mas: List[List[float] | float] = [[], [], [], []]
 
-        def on_brain_bit_resist_data_received(sensor: Sensor, data: BrainBitResistData):
-            mas[0].append(data.O1)
-            mas[1].append(data.O2)
-            mas[2].append(data.T3)
-            mas[3].append(data.T4)
+            def on_brain_bit_resist_data_received(sensor: Sensor, data: BrainBitResistData):
+                mas[0].append(data.O1)
+                mas[1].append(data.O2)
+                mas[2].append(data.T3)
+                mas[3].append(data.T4)
 
-        self.current_sensor.resistDataReceived = on_brain_bit_resist_data_received
-        start_separate_thread(self.current_sensor.exec_command(SensorCommand.StartResist))
+            self.current_sensor.resistDataReceived = on_brain_bit_resist_data_received
+            self.current_sensor.exec_command(SensorCommand.StartResist)
 
-        time.sleep(1)
+            time.sleep(1)
 
-        self.current_sensor.resistDataReceived = None
-        start_separate_thread(self.current_sensor.exec_command(SensorCommand.StopResist))
+            self.current_sensor.resistDataReceived = None
+            self.current_sensor.exec_command(SensorCommand.StopResist)
 
-        for i in range(len(mas)):
-            mas[i] = sum(mas[i]) / len(mas)
+            for i in range(len(mas)):
+                mas[i] = sum(mas[i]) / len(mas)
 
-        return mas
+            self.resistence = mas
+
+        start_separate_thread(target)
 
     def on_current_sensor_battery_state_changed(self, sensor: Sensor, battery: int):
-        print(battery)
+        pass
 
     def get_current_sensor_parameter(self) -> List[ParameterInfo]:
         return self.current_sensor.parameters
@@ -127,13 +137,19 @@ class EmotionDetector:
         del self.scanner
         del self.emotions
 
-core = Core()
+if __name__ == '__main__':
+    core = Core()
 
-core.emotion_detector.start_sensors_search()
-input()
-core.emotion_detector.stop_sensors_search()
-core.emotion_detector.connect_to_sensor(-1)
+    commands = {
+        "strsr": lambda: core.emotion_detector.start_sensors_search(),
+        "srpsr": lambda: core.emotion_detector.stop_sensors_search(),
+    }
 
-print(core.emotion_detector.get_current_sensor_resistence())
+    while True:
+        command = input()
+        command.replace("\n", "")
 
-core.emotion_detector.read_data()
+        if command == "exit":
+            break
+
+        commands[command]()
