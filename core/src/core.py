@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import time
 import typing
 from threading import Thread
 from em_st_artifacts.emotional_math import *
@@ -12,6 +13,10 @@ class Core:
     def __del__(self):
         del self.emotion_detector
 
+
+def start_separate_thread(target: classmethod):
+    Thread(target=target).start()
+
 class EmotionDetector:
     def __init__(self):
         self.scanner: Scanner = Scanner([SensorFamily.LEBrainBit])
@@ -23,7 +28,7 @@ class EmotionDetector:
                                                                 process_win_freq=25,
                                                                 fft_window=1000,
                                                                 n_first_sec_skipped=4,
-                                                                bipolar_mode=False,
+                                                                bipolar_mode=True,
                                                                 channels_number=4,
                                                                 channel_for_analysis=3)
 
@@ -42,7 +47,16 @@ class EmotionDetector:
                                                      self.mental_amd_spectral_settings)
 
     def read_data(self):
-        pass
+        def on_brain_bit_signal_data_received(sensor, data):
+            print(data)
+
+        self.current_sensor.signalDataReceived = on_brain_bit_signal_data_received
+        start_separate_thread(self.current_sensor.exec_command(SensorCommand.StartSignal))
+
+        input()
+
+        self.current_sensor.signalDataReceived = None
+        start_separate_thread(self.current_sensor.exec_command(SensorCommand.StopSignal))
 
     def on_sensors_info_list_changed(self, scanner: Scanner, sensors_info: List[Sensor]):
         print(sensors_info)
@@ -59,24 +73,45 @@ class EmotionDetector:
     def get_sensors_info_list(self) -> List[SensorInfo]:
         return self.current_sensors_info_list
 
-    def connect_to_sensor(self, sensor: int | Sensor) -> Sensor | typing.NoReturn:
+    def connect_to_sensor(self, sensor: int) -> Sensor:
         if self.current_sensor is not None:
             self.current_sensor.disconnect()
 
         if type(sensor) == int:
             s = self.scanner.create_sensor(self.current_sensors_info_list[sensor])
             s.batteryChanged = self.on_current_sensor_battery_state_changed
+            self.current_sensor = s
             return s
-        elif type(sensor) == Sensor:
-            Thread(target=lambda: sensor.connect()).start()
 
     def disconnect_from_sensor(self):
         if self.current_sensor is not None:
             self.current_sensor.disconnect()
             self.current_sensor = None
 
-    def on_current_sensor_battery_state_changed(self, battery: int):
-        pass
+    def get_current_sensor_resistence(self) -> List[float]:
+        mas: List[List[float] | float] = [[], [], [], []]
+
+        def on_brain_bit_resist_data_received(sensor: Sensor, data: BrainBitResistData):
+            mas[0].append(data.O1)
+            mas[1].append(data.O2)
+            mas[2].append(data.T3)
+            mas[3].append(data.T4)
+
+        self.current_sensor.resistDataReceived = on_brain_bit_resist_data_received
+        start_separate_thread(self.current_sensor.exec_command(SensorCommand.StartResist))
+
+        time.sleep(1)
+
+        self.current_sensor.resistDataReceived = None
+        start_separate_thread(self.current_sensor.exec_command(SensorCommand.StopResist))
+
+        for i in range(len(mas)):
+            mas[i] = sum(mas[i]) / len(mas)
+
+        return mas
+
+    def on_current_sensor_battery_state_changed(self, sensor: Sensor, battery: int):
+        print(battery)
 
     def get_current_sensor_parameter(self) -> List[ParameterInfo]:
         return self.current_sensor.parameters
@@ -95,8 +130,10 @@ class EmotionDetector:
 core = Core()
 
 core.emotion_detector.start_sensors_search()
-
 input()
-
 core.emotion_detector.stop_sensors_search()
+core.emotion_detector.connect_to_sensor(-1)
 
+print(core.emotion_detector.get_current_sensor_resistence())
+
+core.emotion_detector.read_data()
