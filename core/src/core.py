@@ -45,6 +45,7 @@ class EmotionDetector:
         pass
 
     def on_sensors_info_list_changed(self, scanner: Scanner, sensors_info: List[Sensor]):
+        print(sensors_info)
         self.current_sensors_info_list = sensors_info
 
     def start_sensors_search(self):
@@ -90,3 +91,12 @@ class EmotionDetector:
     def __del__(self):
         del self.scanner
         del self.emotions
+
+core = Core()
+
+core.emotion_detector.start_sensors_search()
+
+input()
+
+core.emotion_detector.stop_sensors_search()
+
