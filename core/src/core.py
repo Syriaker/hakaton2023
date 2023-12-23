@@ -154,6 +154,9 @@ class EmotionDetector:
     def start(self):
         self.read_data()
 
+    def get_data(self) -> List[float]:
+        ...
+
     def __del__(self):
         self.disconnect_from_sensor()
         del self.scanner
