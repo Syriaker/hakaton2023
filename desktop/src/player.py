@@ -12,12 +12,13 @@ class Player():
     def __init__(self):
         def choose_file():
             global path
-            filename = QFileDialog.getOpenFileName(self, filter=('*.mp3'))
+            filename = QFileDialog.getOpenFileName(filter=('*.mp3'))
             path = filename[0]
             mixer.music.load(path)
             mixer.music.play()
+            print(self.core.emotion_detector.current_sensor)
             self.core.emotion_detector.flush_data()
-            self.core.emotion_detector.read_data()
+            self.core.emotion_detector.start_read_data()
 
         def pause_music():
             if not self.paused:
@@ -37,13 +38,14 @@ class Player():
             print("ку")
 
         def connect():
-            for si in self.core.emotion_detector.get_sensors_info_list():
-                if si.SerialNumber == "132007":
-                    self.core.emotion_detector.connect_to_sensor(si)
-            else:
-                if self.core.emotion_detector.current_sensor is None:
-                    print("no sensor with id 132007")
-                    sys.exit(1)
+            print(1)
+            b = False
+            while not b:
+                for si in self.core.emotion_detector.get_sensors_info_list():
+                    if si.SerialNumber == "132007":
+                        self.core.emotion_detector.connect_to_sensor(si)
+                        b = True
+                        print(2)
 
             self.core.emotion_detector.get_current_sensor_resistence()
 
@@ -61,6 +63,8 @@ class Player():
 
         self.ui.pauseButton.clicked.connect(pause_music)
         self.ui.music_slider.setValue(100)
+
+        self.ui.next_button.clicked.connect(connect)
 
         self.ui.music_slider.valueChanged.connect(volume_change)
         Form.show()
