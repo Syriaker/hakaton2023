@@ -1,12 +1,10 @@
-from PyQt5.QtCore import QEvent
 from PyQt5.QtWidgets import *
-from PyQt5 import QtCore, QtGui, QtWidgets
+from PyQt5 import QtWidgets
 from pygame import mixer
 import sys
 import icon
-import json
-import core
-import time
+from core import core
+
 
 class Player():
     def __init__(self):
