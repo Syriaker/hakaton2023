@@ -25,9 +25,10 @@ class Player():
                 mixer.music.pause()
                 self.paused = True
                 self.core.emotion_detector.stop_read_data()
+                print(self.core.emotion_detector.get_data())
             else:
                 mixer.music.unpause()
-                self.core.emotion_detector.read_data()
+                self.core.emotion_detector.start_read_data()
                 self.paused = False
 
         def volume_change():
@@ -38,14 +39,14 @@ class Player():
             print("ку")
 
         def connect():
-            print(1)
+            print("Connecting")
             b = False
             while not b:
                 for si in self.core.emotion_detector.get_sensors_info_list():
                     if si.SerialNumber == "132007":
                         self.core.emotion_detector.connect_to_sensor(si)
                         b = True
-                        print(2)
+                        print("Connected")
 
             self.core.emotion_detector.get_current_sensor_resistence()
 
@@ -61,10 +62,10 @@ class Player():
         self.ui.setupUi(Form)
         self.ui.add_music.clicked.connect(choose_file)
 
-        self.ui.pauseButton.clicked.connect(pause_music)
+        self.ui.pausebutton.clicked.connect(pause_music)
         self.ui.music_slider.setValue(100)
 
-        self.ui.next_button.clicked.connect(connect)
+        self.ui.B_button.clicked.connect(connect)
 
         self.ui.music_slider.valueChanged.connect(volume_change)
         Form.show()
@@ -72,8 +73,5 @@ class Player():
         ec = self.app.exec_()
         del self.core
         sys.exit(ec)
-
-
-
 
 Player()
