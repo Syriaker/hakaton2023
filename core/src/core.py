@@ -110,7 +110,7 @@ class EmotionDetector:
     def get_sensors_info_list(self) -> List[SensorInfo]:
         return self.current_sensors_info_list
 
-    def connect_to_sensor(self, sensor: int | SensorInfo) -> Sensor:
+    def connect_to_sensor(self, sensor: int) -> Sensor:
         if self.current_sensor is not None:
             self.current_sensor.disconnect()
 

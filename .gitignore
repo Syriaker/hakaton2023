@@ -1,2 +1,4 @@
 /venv/*
 /.idea/*
+sdk_log.log
+user_data.json
