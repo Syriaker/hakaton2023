@@ -3,7 +3,7 @@ from PyQt5 import QtWidgets
 from pygame import mixer
 import sys
 import icon
-from core import core
+import core
 
 
 class Player():
