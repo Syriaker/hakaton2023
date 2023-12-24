@@ -7,10 +7,14 @@ class MusicList:
         self.file: str = "user_data.json"
 
     def read(self):
-        self.data = json.load(open(self.file))
+        file = open(self.file, "w")
+        self.data = json.load(file)
+        file.close()
+
 
     def write(self):
-        json.dump(self.data, open(self.file))
+        file = open(self.file, "w")
+        json.dump(self.data, file)
+        file.close()
 
-    def push_track(self, file: str, name: str, type: int):
-        self.data[name].append({"name": name, "type": type, "file": file})
+    def push_track(self, file: str, name: str,

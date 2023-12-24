@@ -1,5 +1,4 @@
-from __future__ import annotations
-
+import math
 import time
 import typing
 from threading import Thread
@@ -18,7 +17,7 @@ class Core:
 
 class EmotionDetector:
     def __init__(self):
-        self.data_buffer: List[List[float]] = None
+        self.data_buffer: List[typing.Tuple[float, float]] = []
         self.read_data_stop: bool = False
         self.resistence: List[float] = None
 
@@ -26,7 +25,9 @@ class EmotionDetector:
         self.current_sensors_info_list: List[SensorInfo] = []
         self.current_sensor: Sensor = None
 
-        # settings start
+        self.is_ready_current_sensor: bool = False
+
+        # section start settings
         self.math_lib_settings: MathLibSetting = MathLibSetting(sampling_rate=250,
                                                                 process_win_freq=25,
                                                                 fft_window=1000,
@@ -52,45 +53,50 @@ class EmotionDetector:
         self.emotions.set_skip_wins_after_artifact(10)
         self.emotions.set_zero_spect_waves(True, 0, 1, 1, 1, 0)
         self.emotions.set_spect_normalization_by_bands_width(True)
-        # settings end
+        # section end settings
 
-    def read_data(self):
-        def target():
-            self.read_data_stop = False
-
+    # section start data reading
+    def start_read_data(self):
+        self.flush_data()
+        def on_brain_bit_signal_data_received(sensor, data):
             channels: List[RawChannels] = []
 
-            def on_brain_bit_signal_data_received(sensor, data):
-                for d in data:
-                    channels.append(RawChannels(d.T3 - d.O1, d.T4 - d.O2))
+            for d in data:
+                channels.append(RawChannels(d.T3 - d.O1, d.T4 - d.O2))
 
-                self.emotions.push_data(channels)
-                self.emotions.process_data_arr()
+            self.emotions.push_data(channels)
+            self.emotions.process_data_arr()
 
-                if not self.emotions.calibration_finished():
-                    print(f"Calibration A:{self.emotions.is_both_sides_artifacted()} P:{self.emotions.get_calibration_percents()}")
-                else:
-                    if not self.emotions.is_artifacted_sequence():
-                        d = self.emotions.read_mental_data_arr()[-1]
-                        self.data_buffer.append([d.rel_relaxation, d.rel_attention])
-                    print(f"Data D:{self.emotions.read_mental_data_arr()[-1]} A:{self.emotions.is_artifacted_sequence()}")
+            if not self.emotions.calibration_finished():
+                pass
+                print(f"\rCalibration A:{self.emotions.is_both_sides_artifacted()} P:{self.emotions.get_calibration_percents()}",
+                      end="")
+            else:
+                if len(self.data_buffer) == 0:
+                    print("\nCalibration ended")
+                if not self.emotions.is_artifacted_sequence():
+                    mental_data = self.emotions.read_mental_data_arr()
+                    for d in mental_data:
+                        self.data_buffer.append((d.rel_relaxation, d.rel_attention))
+                        print(f"\rA:{d.rel_attention:<5}  R:{d.rel_relaxation:<5s}", end='')
 
-            self.current_sensor.signalDataReceived = on_brain_bit_signal_data_received
-            start_separate_thread(self.current_sensor.exec_command(SensorCommand.StartSignal))
-
-            while not self.read_data_stop:
-                time.sleep(0.2)
-
-            self.current_sensor.signalDataReceived = None
-            start_separate_thread(self.current_sensor.exec_command(SensorCommand.StopSignal))
-
-        start_separate_thread(target)
+        self.current_sensor.signalDataReceived = on_brain_bit_signal_data_received
+        start_separate_thread(self.current_sensor.exec_command(SensorCommand.StartSignal))
 
     def stop_read_data(self):
-        self.read_data_stop = True
+        self.current_sensor.signalDataReceived = None
+        start_separate_thread(self.current_sensor.exec_command(SensorCommand.StopSignal))
+
+    def get_data(self) -> List[typing.Tuple[float, float]]:
+        return self.data_buffer
+
+    def flush_data(self):
+        self.data_buffer = []
+
+    # section end data reading
+    # section start sensors management
 
     def on_sensors_info_list_changed(self, scanner: Scanner, sensors_info: List[SensorInfo]):
-        print(sensors_info[-1])
         self.current_sensors_info_list = sensors_info
 
     def start_sensors_search(self):
@@ -108,16 +114,10 @@ class EmotionDetector:
         if self.current_sensor is not None:
             self.current_sensor.disconnect()
 
-        if type(sensor) == int:
-            s = self.scanner.create_sensor(self.current_sensors_info_list[sensor])
-            s.batteryChanged = self.on_current_sensor_battery_state_changed
-            self.current_sensor = s
-            return s
-        elif type(sensor) == SensorInfo:
-            s = self.scanner.create_sensor(sensor)
-            s.batteryChanged = self.on_current_sensor_battery_state_changed
-            self.current_sensor = s
-            return s
+        s = self.scanner.create_sensor(self.current_sensors_info_list[sensor] if type(sensor) == int else sensor)
+        s.batteryChanged = self.on_current_sensor_battery_state_changed
+        self.current_sensor = s
+        return s
 
     def disconnect_from_sensor(self):
         if self.current_sensor is not None:
@@ -125,20 +125,25 @@ class EmotionDetector:
             self.current_sensor = None
 
     def get_current_sensor_resistence(self):
+        self.start_get_current_sensor_resistence()
+
+    def start_get_current_sensor_resistence(self):
         def target():
             def on_brain_bit_resist_data_received(sensor: Sensor, data: BrainBitResistData):
-                print(data.O1, data.O2, data.T3, data.T4)
+                if not any(map(math.isinf, [data.O1, data.O2, data.T3, data.T4])):
+                    print(*map(math.ceil, [data.O1, data.O2, data.T3, data.T4]))
+                    self.stop_get_current_sensor_resistence()
+                    self.is_ready_current_sensor = True
 
             self.current_sensor.resistDataReceived = on_brain_bit_resist_data_received
             self.current_sensor.exec_command(SensorCommand.StartResist)
-            self.start_calibration()
 
-            time.sleep(10)
-
-            self.current_sensor.resistDataReceived = None
-            self.current_sensor.exec_command(SensorCommand.StopResist)
-
+        self.is_ready_current_sensor = False
         start_separate_thread(target)
+
+    def stop_get_current_sensor_resistence(self):
+        self.current_sensor.resistDataReceived = None
+        self.current_sensor.exec_command(SensorCommand.StopResist)
 
     def on_current_sensor_battery_state_changed(self, sensor: Sensor, battery: int):
         pass
@@ -146,52 +151,62 @@ class EmotionDetector:
     def get_current_sensor_parameters(self) -> List[ParameterInfo]:
         return self.current_sensor.parameters
 
-    def get_current_sensor_commands(self):
+    def get_current_sensor_commands(self) -> List[SensorCommand]:
         return self.current_sensor.commands
 
     def start_calibration(self):
         self.emotions.start_calibration()
 
-    def stop_calibration(self):
-        self.emotions.calibration_finished()
+    # section end sensors management
 
     def start(self):
-        self.read_data()
-
-    def get_data(self) -> List[float]:
-        relax = 0
-        attention = 0
-        count = 0
-
-        for datum in self.data_buffer:
-            relax += datum[0]
-            attention += datum[1]
-
-        return [relax / count, attention / count]
-
-    def flush_data(self):
-        self.data_buffer = None
+        self.start_read_data()
 
     def __del__(self):
         self.disconnect_from_sensor()
         del self.scanner
         del self.emotions
 
+
 if __name__ == '__main__':
+    def test():
+        global core
+
+        core.emotion_detector.start_sensors_search()
+        time.sleep(5)
+        core.emotion_detector.stop_sensors_search()
+
+        for si in core.emotion_detector.get_sensors_info_list():
+            if si.SerialNumber == "132007":
+                core.emotion_detector.connect_to_sensor(si)
+        else:
+            if core.emotion_detector.current_sensor is None:
+                print("no sensor with serial number 132007 founded")
+                return
+
+        core.emotion_detector.get_current_sensor_resistence()
+
+        input("1\n")
+        core.emotion_detector.start_calibration()
+        core.emotion_detector.start_read_data()
+        input("2\n")
+        core.emotion_detector.stop_read_data()
+        del core
+
     core = Core()
 
     commands: typing.Dict[str, typing.Callable] = {
         "strsr": lambda d: core.emotion_detector.start_sensors_search(),
         "stpsr": lambda d: core.emotion_detector.stop_sensors_search(),
-        "snrinflst": lambda d: print(core.emotion_detector.get_sensors_info_list()),
-        "snrcnt": lambda d: core.emotion_detector.connect_to_sensor(int(d[0])),
-        "start": lambda d: core.emotion_detector.start(),
-        "snrrst": lambda d: core.emotion_detector.get_current_sensor_resistence(),
-        "clb": lambda d: core.emotion_detector.start_calibration(),
+        "list": lambda d: print(core.emotion_detector.get_sensors_info_list()),
+        "cnt": lambda d: core.emotion_detector.connect_to_sensor(int(d[0])),
+        "rst": lambda d: core.emotion_detector.get_current_sensor_resistence(),
+        "start": lambda d: test(),
+        "btr": lambda d: print(core.emotion_detector.current_sensor.batt_power),
     }
 
-    while False:
-        command = input()
+    while True:
+        command = input(">>> ")
         command.replace("\n", "")
 
         if command == "exit":
@@ -202,23 +217,3 @@ if __name__ == '__main__':
             commands[cmd[0]](cmd[1:] if len(cmd) > 1 else [])
         else:
             print("illegal command")
-
-    core.emotion_detector.start_sensors_search()
-    time.sleep(10)
-    core.emotion_detector.stop_sensors_search()
-
-    for si in core.emotion_detector.get_sensors_info_list():
-        if si.SerialNumber == "132007":
-            core.emotion_detector.connect_to_sensor(si)
-    else:
-        if core.emotion_detector.current_sensor is None:
-            print("no sensor with id 132007")
-            sys.exit(1)
-
-    core.emotion_detector.get_current_sensor_resistence()
-
-    core.emotion_detector.read_data()
-    input()
-    core.emotion_detector.stop_read_data()
-
-    del core
