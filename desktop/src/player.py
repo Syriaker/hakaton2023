@@ -47,17 +47,21 @@ class Player():
 
             self.core.emotion_detector.get_current_sensor_resistence()
 
-        Form = QtWidgets.QWidget()
-        mixer.init()
         self.core = core.Core()
         self.core.emotion_detector.start_sensors_search()
+        mixer.init()
         self.app = QtWidgets.QApplication(sys.argv)
+        Form = QtWidgets.QWidget()
+
         self.paused = False
         self.ui = icon.Ui_Form()
+
         self.ui.setupUi(Form)
         self.ui.add_music.clicked.connect(choose_file)
+
         self.ui.pauseButton.clicked.connect(pause_music)
         self.ui.music_slider.setValue(100)
+
         self.ui.music_slider.valueChanged.connect(volume_change)
         Form.show()
 
