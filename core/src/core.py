@@ -57,7 +57,6 @@ class EmotionDetector:
 
     # section start data reading
     def start_read_data(self):
-        self.flush_data()
         def on_brain_bit_signal_data_received(sensor, data):
             channels: List[RawChannels] = []
 
@@ -81,6 +80,7 @@ class EmotionDetector:
                         print(f"\rA:{d.rel_attention:<5}  R:{d.rel_relaxation:<5s}", end='')
 
         self.current_sensor.signalDataReceived = on_brain_bit_signal_data_received
+
         start_separate_thread(self.current_sensor.exec_command(SensorCommand.StartSignal))
 
     def stop_read_data(self):
@@ -132,7 +132,7 @@ class EmotionDetector:
             def on_brain_bit_resist_data_received(sensor: Sensor, data: BrainBitResistData):
                 if not any(map(math.isinf, [data.O1, data.O2, data.T3, data.T4])):
                     print(*map(math.ceil, [data.O1, data.O2, data.T3, data.T4]))
-                    self.stop_get_current_sensor_resistence()
+                    start_separate_thread(self.stop_get_current_sensor_resistence)
                     self.is_ready_current_sensor = True
 
             self.current_sensor.resistDataReceived = on_brain_bit_resist_data_received
@@ -142,6 +142,7 @@ class EmotionDetector:
         start_separate_thread(target)
 
     def stop_get_current_sensor_resistence(self):
+        print("stop")
         self.current_sensor.resistDataReceived = None
         self.current_sensor.exec_command(SensorCommand.StopResist)
 
