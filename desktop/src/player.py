@@ -12,7 +12,7 @@ class Player():
     def __init__(self):
         def choose_file():
             global path
-            filename = QFileDialog.getOpenFileName(filter=('*.mp3'))
+            filename = QFileDialog.getOpenFileName(self, filter=('*.mp3'))
             path = filename[0]
             mixer.music.load(path)
             mixer.music.play()
@@ -36,24 +36,22 @@ class Player():
         def analysis():
             print("ку")
 
-        self.core = core.Core()
-        app = QtWidgets.QApplication(sys.argv)
+        def connect():
+            for si in self.core.emotion_detector.get_sensors_info_list():
+                if si.SerialNumber == "132007":
+                    self.core.emotion_detector.connect_to_sensor(si)
+            else:
+                if self.core.emotion_detector.current_sensor is None:
+                    print("no sensor with id 132007")
+                    sys.exit(1)
 
-        self.core.emotion_detector.start_sensors_search()
-        time.sleep(10)
-        self.core.emotion_detector.stop_sensors_search()
-        for si in self.core.emotion_detector.get_sensors_info_list():
-            if si.SerialNumber == "132007":
-                self.core.emotion_detector.connect_to_sensor(si)
-        else:
-            if self.core.emotion_detector.current_sensor is None:
-                print("no sensor with id 132007")
-                sys.exit(1)
-
-        self.core.emotion_detector.get_current_sensor_resistence()
+            self.core.emotion_detector.get_current_sensor_resistence()
 
         Form = QtWidgets.QWidget()
         mixer.init()
+        self.core = core.Core()
+        self.core.emotion_detector.start_sensors_search()
+        self.app = QtWidgets.QApplication(sys.argv)
         self.paused = False
         self.ui = icon.Ui_Form()
         self.ui.setupUi(Form)
@@ -63,7 +61,7 @@ class Player():
         self.ui.music_slider.valueChanged.connect(volume_change)
         Form.show()
 
-        ec = app.exec_()
+        ec = self.app.exec_()
         del self.core
         sys.exit(ec)
 
