@@ -68,20 +68,20 @@ class EmotionDetector:
 
             if not self.emotions.calibration_finished():
                 pass
-                print(f"\rCalibration A:{self.emotions.is_both_sides_artifacted()} P:{self.emotions.get_calibration_percents()}",
-                      end="")
             else:
                 if len(self.data_buffer) == 0:
-                    print("\nCalibration ended")
+                    self.on_calibration_end()
                 if not self.emotions.is_artifacted_sequence():
                     mental_data = self.emotions.read_mental_data_arr()
                     for d in mental_data:
                         self.data_buffer.append((d.rel_relaxation, d.rel_attention))
-                        print(f"\rA:{d.rel_attention}  R:{d.rel_relaxation}", end='')
 
         self.current_sensor.signalDataReceived = on_brain_bit_signal_data_received
 
         start_separate_thread(self.current_sensor.exec_command(SensorCommand.StartSignal))
+
+    def on_calibration_end(self):
+        pass
 
     def stop_read_data(self):
         self.current_sensor.signalDataReceived = None
@@ -131,7 +131,6 @@ class EmotionDetector:
         def target():
             def on_brain_bit_resist_data_received(sensor: Sensor, data: BrainBitResistData):
                 if not any(map(math.isinf, [data.O1, data.O2, data.T3, data.T4])):
-                    print(*map(math.ceil, [data.O1, data.O2, data.T3, data.T4]))
                     start_separate_thread(self.stop_get_current_sensor_resistence)
                     self.is_ready_current_sensor = True
 
@@ -142,7 +141,6 @@ class EmotionDetector:
         start_separate_thread(target)
 
     def stop_get_current_sensor_resistence(self):
-        print("stop")
         self.current_sensor.resistDataReceived = None
         self.current_sensor.exec_command(SensorCommand.StopResist)
 

@@ -15,7 +15,6 @@ class MusicList:
             file = open(self.file, "r")
             self.data = json.load(file)
             file.close()
-        print(self.data)
 
     def write(self):
         file = open(self.file, "w")
