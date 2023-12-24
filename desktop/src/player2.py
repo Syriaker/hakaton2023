@@ -16,25 +16,26 @@ class Player():
         path = filename[0]
         mixer.music.load(path)
         mixer.music.play()
+        self.core.emotion_detector.flush_data()
         self.core.emotion_detector.read_data()
         #self.lenght = mixer.music.get_pos()
         self.core.emotion_detector.stop_read_data()
-        if (self.core.emotion_detector.get_data())[0] > (self.core.emotion_detector.get_data())[1]:
+        '''if (self.core.emotion_detector.get_data())[0] > (self.core.emotion_detector.get_data())[1]:
             print('релакс')
         else:
-            print('концентрация')
+            print('концентрация')'''
 
 
     def pauseMusic(self):
         if not self.paused:
             mixer.music.pause()
             self.paused = True
+            self.core.emotion_detector.stop_read_data()
+            print(self.core.emotion_detector.get_data())
         else:
             mixer.music.unpause()
+            self.core.emotion_detector.read_data()
             self.paused = False
-        self.core.emotion_detector.stop_read_data()
-        print(self.core.emotion_detector.get_data())
-
 
 
     def volume_change(self):

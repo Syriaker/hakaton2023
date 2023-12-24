@@ -68,7 +68,7 @@ class Ui_Form(object):
         self.label_4 = QtWidgets.QLabel(self.widget_4)
         self.label_4.setGeometry(QtCore.QRect(0, 0, 95, 66))
         self.label_4.setText("")
-        self.label_4.setPixmap(QtGui.QPixmap("../Downloads/Group 3.png"))
+        self.label_4.setPixmap(QtGui.QPixmap("photo_5204339240274613699_m.jpg"))
         self.label_4.setObjectName("label_4")
         self.label_4.raise_()
         self.next_button.raise_()
