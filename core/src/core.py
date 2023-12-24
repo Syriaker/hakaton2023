@@ -77,7 +77,7 @@ class EmotionDetector:
                     mental_data = self.emotions.read_mental_data_arr()
                     for d in mental_data:
                         self.data_buffer.append((d.rel_relaxation, d.rel_attention))
-                        print(f"\rA:{d.rel_attention:<5}  R:{d.rel_relaxation:<5s}", end='')
+                        print(f"\rA:{d.rel_attention}  R:{d.rel_relaxation}", end='')
 
         self.current_sensor.signalDataReceived = on_brain_bit_signal_data_received
 
